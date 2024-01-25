@@ -38,7 +38,7 @@ msp_FIND_NEXT = c.c_uint(1)
 
 
 msp_FLAGID = msp_DWORD
-msp_REGID = msp_DWORD
+msp_REGID = msp_BYTE
 
 
 class msp_DeviceInfo(c.Structure):
@@ -60,4 +60,19 @@ class msp_REGVALUE(c.Structure):
     _fields_ = [
         ('reg', msp_REGID),
         ('value', msp_WORD)
+    ]
+    
+class msp_Message(c.Structure):
+        _fields_ = [
+        ("type", msp_WORD),
+        ("dataWordCount", msp_WORD),
+        ("bccw", msp_WORD),
+        ("CmdWord1", msp_WORD),
+        ("CmdWord2", msp_WORD),
+        ("Data", msp_WORD),
+        ("StatusWord1", msp_WORD),
+        ("StatusWord2", msp_WORD),
+        ("loopback", msp_WORD),
+        ("bsw", msp_WORD),
+        ("timetag", msp_WORD),
     ]

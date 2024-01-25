@@ -55,7 +55,6 @@ def close_rtl2_device(dev_handle):
 
 # Пример использования функций
 device_handle = open_rtl2_device(0)
-print(device_handle)
 
 raw_device_info = msp_DeviceInfo()
 result = rtl2.msp_GetDeviceInfo(0, ctypes.byref(raw_device_info))
@@ -74,21 +73,10 @@ bcflags = (msp_FLAGID * 6)(
 
 msp_Configure(device_handle, msp_MODE_BC + msp_MODE_ENHANCED, bcflags, None)
 
-msp_SetFlagsIndirect(device_handle, bcflags, 0)
-
-enhanced_mode_flag = msp_GetFlag(device_handle, mspF_ENHANCED_MODE)
-ic(enhanced_mode_flag)
-
-enhanced_mode_flag = msp_GetFlag(device_handle, mspF_256WORD_BOUNDARY_DISABLE)
-ic(enhanced_mode_flag)
-
-enhanced_mode_flag = msp_GetFlag(device_handle, mspF_MESSAGE_GAP_TIMER_ENABLED)
-ic(enhanced_mode_flag)
-
-msp_SetFlag(device_handle, mspF_ENHANCED_MODE, 1)
 
 
-reg = msp_ReadReg(device_handle, 0x07)
-ic(bin(reg))
+ic(msp_WriteReg(device_handle, mspRR_CONFIG2, 0b0011000010001000))
+reg = msp_ReadReg(device_handle, mspRR_CONFIG2)
+ic(f'0b{reg:016b}')
 
 close_rtl2_device(device_handle)
