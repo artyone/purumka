@@ -186,3 +186,15 @@ msp_WriteMessageWord = rtl2.msp_WriteMessageWord
 msp_WriteMessageWord.argtypes = [msp_MSGHANDLE, msp_BYTE, msp_WORD]
 msp_WriteMessageWord.restype = msp_ERROR
 
+msp_GetMessageStatus = rtl2.msp_GetMessageStatus
+msp_GetMessageStatus.argtypes = [msp_STKHANDLE, c_int]
+msp_GetMessageStatus.restype = msp_MESSAGE_STATUS
+
+msp_Start = rtl2.msp_Start
+
+msp_RetrieveMessage = rtl2.msp_RetrieveMessage
+msp_RetrieveMessage.argtypes = [msp_STKHANDLE, c_int, POINTER(msp_Message)]
+msp_RetrieveMessage.restype = msp_ERROR
+
+
+

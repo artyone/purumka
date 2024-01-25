@@ -19,10 +19,13 @@ msp_MODE = msp_DWORD
 msp_DIR = msp_BYTE
 msp_BOOL = msp_BYTE
 
-class msp_MESSAGE_STATUS:
-    msp_MESSAGE_WAITING = c.c_uint(0)
-    msp_MESSAGE_IN_PROGRESS = c.c_uint(1)
-    msp_MESSAGE_COMPLETED = c.c_uint(2)
+class msp_MESSAGE_STATUS(c.c_int):
+    _fields_ = [
+        ("msp_MESSAGE_WAITING", c.c_int),
+        ("msp_MESSAGE_IN_PROGRESS", c.c_int),
+        ("msp_MESSAGE_COMPLETED", c.c_int)
+    ]
+
 
 msp_FRMHANDLE = msp_STKHANDLE
 msp_MSGHANDLE = msp_RAMHANDLE
