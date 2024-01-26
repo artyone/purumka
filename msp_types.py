@@ -39,9 +39,8 @@ msp_TRUE = c.c_uint(1)
 msp_FIND_FIRST = c.c_uint(0)
 msp_FIND_NEXT = c.c_uint(1)
 
-
 msp_FLAGID = msp_DWORD
-msp_REGID = msp_BYTE
+msp_REGID = msp_DWORD
 
 
 class msp_DeviceInfo(c.Structure):

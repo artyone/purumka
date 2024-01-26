@@ -4,10 +4,8 @@ from msp_types import *
 from msp_fucntions import *
 from msp_flags import *
 from icecream import ic
-
-
-# Подгрузим библиотеку RTL2 (предполагается, что она доступна в системе)
-rtl2 = ctypes.CDLL("./drtl3.dll")
+from time import sleep
+import numpy as np
 
 
 class ClassWrapper:
@@ -22,45 +20,24 @@ class ClassWrapper:
         return ' '.join(res)
 
 
-def open_rtl2_device(device_index):
-    """
-    Открывает устройство RTL2.
-
-    :param device_index: Индекс устройства
-    :return: Дескриптор устройства
-    """
-    msp_Startup()
-    dev_handle = msp_Open(device_index)
-
-    if not dev_handle:
-        raise RuntimeError("Ошибка открытия устройства")
-    return dev_handle
+msgctr = 0
+val = 25
+buf = (msp_WORD * 32)(*([25] * 32))
 
 
-def close_rtl2_device(dev_handle):
-    """
-    Закрывает устройство RTL2.
 
-    :param dev_handle: Дескриптор устройства
-    """
-    res = rtl2.msp_Close(dev_handle)
-    if res == 0:
-        return
-    if res == msp_ERROR_INVALID_DEVICE_HANDLE:
-        raise RuntimeError(
-            "Недействительный или неинициализированный дескриптор модуля")
-    if res == msp_ERROR_INTERNAL_ACCESS_ERROR:
-        raise RuntimeError("Внутренняя ошибка")
+msp_Startup()
+
+bc = msp_Open(0)
+if not bc:
+    print("Failed open bc")
 
 
-# Пример использования функций
-device_handle = open_rtl2_device(0)
+# raw_device_info = msp_DeviceInfo()
+# result = rtl2.msp_GetDeviceInfo(0, ctypes.byref(raw_device_info))
 
-raw_device_info = msp_DeviceInfo()
-result = rtl2.msp_GetDeviceInfo(0, ctypes.byref(raw_device_info))
-
-device_info = ClassWrapper(raw_device_info)
-print(f"Device Information - {device_info}")
+# device_info = ClassWrapper(raw_device_info)
+# ic(f"Device Information - {device_info}")
 
 bcflags = (msp_FLAGID * 6)(
     mspF_ENHANCED_MODE,
@@ -71,12 +48,33 @@ bcflags = (msp_FLAGID * 6)(
     0
 )
 
-msp_Configure(device_handle, msp_MODE_BC + msp_MODE_ENHANCED, bcflags, None)
+msp_Configure(bc, msp_MODE_BC + msp_MODE_ENHANCED, bcflags, None)
+fr = msp_CreateFrame(bc, 1000, 2)
+if not fr:
+    print("Failed create frame")
+
+message_one = msp_Message()
+
+
+msp_AddMessage(fr, 
+               msp_CreateMessage(bc,
+                                 msp_RTtoBC(message_one, 4, 1, 4, msp_BCCW_CHANNEL_A)), 
+               1000)
+
+
+msp_LoadFrame(fr, msp_AUTOREPEAT)
+
+msp_Start(bc)
 
 
 
-ic(msp_WriteReg(device_handle, mspRR_CONFIG2, 0b0011000010001000))
-reg = msp_ReadReg(device_handle, mspRR_CONFIG2)
-ic(f'0b{reg:016b}')
+E = msp_RetrieveMessage(fr, msp_NEXT_MESSAGE, message_one)
 
-close_rtl2_device(device_handle)
+print(message_one.Data)
+
+
+# reg = msp_ReadReg(dev_handle, mspRR_CONFIG3)
+# ic(f'0b{reg:016b}')
+# msp_Reset(dev_handle)
+# msp_Close(dev_handle)
+# msp_Cleanup(dev_handle)
