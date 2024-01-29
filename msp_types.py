@@ -71,7 +71,7 @@ class msp_Message(c.Structure):
         ("bccw", msp_WORD),
         ("CmdWord1", msp_WORD),
         ("CmdWord2", msp_WORD),
-        ("Data", msp_WORD),
+        ("Data", msp_WORD * 32),
         ("StatusWord1", msp_WORD),
         ("StatusWord2", msp_WORD),
         ("loopback", msp_WORD),

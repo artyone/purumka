@@ -329,3 +329,11 @@ msp_ResetStack = rtl2.msp_ResetStack
 msp_ResetStack.argtypes = [msp_STKHANDLE, c_int]
 msp_ResetStack.restype = msp_ERROR
 msp_ResetStack.errcheck = error_check
+
+msp_GetNumberOfDevices = rtl2.msp_GetNumberOfDevices
+msp_GetNumberOfDevices.argtypes = []
+msp_GetNumberOfDevices.restype = c_int
+
+msp_GetDeviceInfo = rtl2.msp_GetDeviceInfo
+msp_GetDeviceInfo.argtypes = [c_int, POINTER(msp_DeviceInfo)]
+msp_GetDeviceInfo.errcheck = error_check

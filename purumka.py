@@ -25,8 +25,9 @@ val = 25
 buf = (msp_WORD * 32)(*([25] * 32))
 
 
-
 msp_Startup()
+ic(msp_GetNumberOfDevices())
+
 
 bc = msp_Open(0)
 if not bc:
@@ -49,6 +50,8 @@ bcflags = (msp_FLAGID * 6)(
 )
 
 msp_Configure(bc, msp_MODE_BC + msp_MODE_ENHANCED, bcflags, None)
+
+
 fr = msp_CreateFrame(bc, 1000, 2)
 if not fr:
     print("Failed create frame")
@@ -56,9 +59,9 @@ if not fr:
 message_one = msp_Message()
 
 
-msp_AddMessage(fr, 
+msp_AddMessage(fr,
                msp_CreateMessage(bc,
-                                 msp_RTtoBC(message_one, 4, 1, 4, msp_BCCW_CHANNEL_A)), 
+                                 msp_RTtoBC(message_one, 4, 1, 2, msp_BCCW_CHANNEL_A)),
                1000)
 
 
@@ -67,14 +70,22 @@ msp_LoadFrame(fr, msp_AUTOREPEAT)
 msp_Start(bc)
 
 
-
 E = msp_RetrieveMessage(fr, msp_NEXT_MESSAGE, message_one)
 
-print(message_one.Data)
-
+print(*message_one.Data)
+ic(f'0x{message_one.type:04x}')
+ic(f'0x{message_one.dataWordCount:04x}')
+ic(f'0x{message_one.bccw:04x}')
+ic(f'0x{message_one.CmdWord1:04x}')
+ic(f'0x{message_one.CmdWord2:04x}')
+ic(f'0x{message_one.StatusWord1:04x}')
+ic(f'0x{message_one.StatusWord2:04x}')
+ic(f'0x{message_one.loopback:04x}')
+ic(f'0x{message_one.bsw:04x}')
+ic(f'0x{message_one.timetag:04x}')
 
 # reg = msp_ReadReg(dev_handle, mspRR_CONFIG3)
 # ic(f'0b{reg:016b}')
-# msp_Reset(dev_handle)
-# msp_Close(dev_handle)
-# msp_Cleanup(dev_handle)
+msp_Reset(bc)
+msp_Close(bc)
+msp_Cleanup(bc)
