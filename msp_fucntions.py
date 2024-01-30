@@ -87,6 +87,11 @@ msp_WriteReg.argtypes = [msp_DEVHANDLE, msp_REGID, msp_WORD]
 msp_WriteReg.restype = msp_ERROR
 msp_WriteReg.errcheck = error_check
 
+msp_SetVRegsIndirect = rtl2.msp_SetVRegsIndirect
+msp_SetVRegsIndirect.argtypes = [msp_DEVHANDLE, POINTER(msp_REGID), msp_WORD]
+msp_SetVRegsIndirect.restype = msp_ERROR
+msp_SetVRegsIndirect.errcheck = error_check
+
 msp_ReadRamW = rtl2.msp_ReadRamW
 msp_ReadRamW.argtypes = [msp_DEVHANDLE, msp_WORD]
 msp_ReadRamW.restype = msp_WORD
