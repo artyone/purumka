@@ -17,11 +17,13 @@ def error_check(result, func, args):
         raise RuntimeError(error, func.__name__, args)
     return result
 
+
 def get_last_error(result, func, args):
     err = msp_GetLastError()
     if err != 0:
         error_check(err, func, args)
     return result
+
 
 msp_GetLastError = rtl2.msp_GetLastError
 msp_GetLastError.restype = msp_ERROR
@@ -207,7 +209,8 @@ def mspi_mcsa(cw):
 
 
 def msp_BCtoRT(B, RT, SA, wcnt, data, cw):
-    res = msp_FormatMessage(c.byref(B), mspM_BCtoRT, RT, SA, 0, 0, wcnt, data, cw)
+    res = msp_FormatMessage(c.byref(B), mspM_BCtoRT,
+                            RT, SA, 0, 0, wcnt, data, cw)
     return res
 
 
@@ -299,26 +302,34 @@ msp_Command.argtypes = [msp_DEVHANDLE, msp_WORD]
 msp_Command.restype = msp_ERROR
 msp_Command.errcheck = error_check
 
+
 def msp_Start(device):
     return msp_Command(device, mspC_START)
+
 
 def msp_Reset(device):
     return msp_Command(device, mspC_RESET)
 
-def msp_ResetInterrupt(device): 
+
+def msp_ResetInterrupt(device):
     return msp_Command(device, mspC_INTERRUPT_RESET)
 
-def msp_ResetTimeTag(device): 
+
+def msp_ResetTimeTag(device):
     return msp_Command(device, mspC_TIME_TAG_RESET)
 
-def msp_TimeTagTestClock(device): 
+
+def msp_TimeTagTestClock(device):
     return msp_Command(device, mspC_TIME_TAG_TEST_CLOCK)
+
 
 def msp_StopOnFrame(device):
     return msp_Command(device, mspC_STOP_ON_FRAME)
 
+
 def msp_StopOnMessage(device):
     return msp_Command(device, mspC_STOP_ON_MESSAGE)
+
 
 msp_RamTotal = rtl2.msp_RamTotal
 msp_RamTotal.argtypes = [msp_DEVHANDLE]

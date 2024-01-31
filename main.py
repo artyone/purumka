@@ -1,24 +1,26 @@
+import ctypes
 import os
 import sys
 import time
-from itertools import cycle, count
-import ctypes
-from msp_constants import *
-from msp_types import *
-from msp_fucntions import *
-from msp_flags import *
-from icecream import ic
-
 from functools import partial
+from itertools import count, cycle
+
 import numpy as np
+from icecream import ic
 from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtNetwork import QUdpSocket
-from PyQt5.QtWidgets import (QAction, QApplication, QComboBox, QHBoxLayout, QGridLayout,
-                             QLabel, QMainWindow, QMenu, QCheckBox, QGroupBox,
-                             QPushButton, QSlider, QStyle, QToolBar, QRadioButton,
-                             QTreeWidget, QTreeWidgetItem, QVBoxLayout, QTextEdit,
-                             QWidget, QLineEdit)
+from PyQt5.QtWidgets import (QAction, QApplication, QCheckBox, QComboBox,
+                             QGridLayout, QGroupBox, QHBoxLayout, QLabel,
+                             QLineEdit, QMainWindow, QMenu, QPushButton,
+                             QRadioButton, QSlider, QStyle, QTextEdit,
+                             QToolBar, QTreeWidget, QTreeWidgetItem,
+                             QVBoxLayout, QWidget)
+
+from msp_constants import *
+from msp_flags import *
+from msp_fucntions import *
+from msp_types import *
 from rtl import RTL
 
 
@@ -75,7 +77,6 @@ class MainWindow(QMainWindow):
             'Отправить из ДИСС в БИС подадрес 02')
         send_diss_to_bis_btn02.clicked.connect(self.send_diss_biss_02)
         self.main_layout.addWidget(send_diss_to_bis_btn02)
-
 
         self.add_log_button = QPushButton('Отправить команду тест', self)
         self.add_log_button.clicked.connect(self.send_command)
@@ -158,9 +159,9 @@ class MainWindow(QMainWindow):
             ('Точность установки блока по курсу', 'kurs_accuracy_bis_ledit'),
             ('Абсолютная высота полёта', 'absolute_height_bis_ledit'),
         ]
-        
+
         self.input_le = []
-        positions = [(j, i) for i in range(2,4) for j in range(4)]
+        positions = [(j, i) for i in range(2, 4) for j in range(4)]
         for position, (header, val) in zip(positions, headers_params):
             layout = QHBoxLayout()
             le = QLineEdit()
@@ -229,7 +230,7 @@ class MainWindow(QMainWindow):
             layout.addWidget(label)
             box_layout.addLayout(layout, *position)
             self.output_le01.append(le)
-            
+
         box_layout.setColumnStretch(5, 1)
 
         self.main_layout.addWidget(group_box)
@@ -295,8 +296,9 @@ class MainWindow(QMainWindow):
                 f'<b>{next(self.log_counter)}</b>. Ошибка подключения устройства')
             self.udpate_combobox()
             return
-        
-        msp_WriteReg(self.dev_handle, mspRR_EXTERNAL_USB_POWER, 0 if self.usb_combo_box.currentIndex() else 1)
+
+        msp_WriteReg(self.dev_handle, mspRR_EXTERNAL_USB_POWER,
+                     0 if self.usb_combo_box.currentIndex() else 1)
 
         bcflags = (msp_FLAGID * 6)(
             mspF_ENHANCED_MODE,
@@ -309,9 +311,9 @@ class MainWindow(QMainWindow):
 
         try:
             msp_Configure(
-                self.dev_handle, 
-                msp_MODE_BC + msp_MODE_ENHANCED, 
-                bcflags, 
+                self.dev_handle,
+                msp_MODE_BC + msp_MODE_ENHANCED,
+                bcflags,
                 None
             )
             self.log_text.append(
@@ -320,7 +322,6 @@ class MainWindow(QMainWindow):
             self.log_text.append(
                 f'<b>{next(self.log_counter)}</b>. Ошибка: {e}')
             return
-        
 
     def deactivate_device(self):
         if self.dev_handle is not None:
@@ -396,11 +397,12 @@ class MainWindow(QMainWindow):
         message = msp_Message()
 
         channel = msp_BCCW_CHANNEL_B if self.channel_combo_box.currentIndex() else msp_BCCW_CHANNEL_A
-        
-        data = [int(widget.text()) if widget.text() else 0 for widget in self.input_le ]
-        
+
+        data = [int(widget.text()) if widget.text()
+                else 0 for widget in self.input_le]
+
         raw_data = (msp_WORD * 7)(*data)
-        
+
         msp_AddMessage(
             fr,
             msp_CreateMessage(
@@ -417,17 +419,16 @@ class MainWindow(QMainWindow):
         self.log_text.append(
             f'<b>{next(self.log_counter)}</b>. Отправлена команда: 0x{message.CmdWord1:04x}')
 
-
         recv_data = message.Data[:message.dataWordCount]
-        
+
         if not recv_data:
             log_message = f'<b>{next(self.log_counter)}</b>. Данные не получены'
             self.log_text.append(log_message)
             return
-        
+
         # for widget, val in zip(self.output_le01, recv_data):
         #     widget.setText(f'{val}')
-            
+
         # for widget, mask in self.output_chkbox.items():
         #     if recv_data[1] & mask != 0:
         #         widget.setDisabled(False)
@@ -437,13 +438,11 @@ class MainWindow(QMainWindow):
         #         widget.setDisabled(False)
         #         widget.setChecked(False)
         #         widget.setDisabled(True)
-            
 
         recv_data = [f'<b>0x{data:04x}</b>' for data in recv_data]
 
         log_message = f'<b>{next(self.log_counter)}</b>. Отправленные данные: {":".join(recv_data)}'
         self.log_text.append(log_message)
-
 
     def send_diss_biss_01(self):
         if self.dev_handle is None:
@@ -466,7 +465,7 @@ class MainWindow(QMainWindow):
         channel = msp_BCCW_CHANNEL_B if self.channel_combo_box.currentIndex() else msp_BCCW_CHANNEL_A
 
         ic(channel)
-        
+
         msp_AddMessage(
             fr,
             msp_CreateMessage(
@@ -484,17 +483,17 @@ class MainWindow(QMainWindow):
             f'<b>{next(self.log_counter)}</b>. Отправлена команда: 0x{message.CmdWord1:04x}')
 
         ic(msp_RetrieveMessage(fr, msp_NEXT_MESSAGE, message))
-        
+
         recv_data = message.Data[:message.dataWordCount]
-        
+
         if not recv_data:
             log_message = f'<b>{next(self.log_counter)}</b>. Данные не получены'
             self.log_text.append(log_message)
             return
-        
+
         for widget, val in zip(self.output_le01, recv_data):
             widget.setText(f'{val}')
-            
+
         for widget, mask in self.output_chkbox.items():
             if recv_data[1] & mask != 0:
                 widget.setDisabled(False)
@@ -504,7 +503,6 @@ class MainWindow(QMainWindow):
                 widget.setDisabled(False)
                 widget.setChecked(False)
                 widget.setDisabled(True)
-            
 
         recv_data = [f'<b>0x{data:04x}</b>' for data in recv_data]
 
@@ -532,7 +530,7 @@ class MainWindow(QMainWindow):
         channel = msp_BCCW_CHANNEL_B if self.channel_combo_box.currentIndex() else msp_BCCW_CHANNEL_A
 
         ic(channel)
-        
+
         msp_AddMessage(
             fr,
             msp_CreateMessage(
@@ -550,17 +548,17 @@ class MainWindow(QMainWindow):
             f'<b>{next(self.log_counter)}</b>. Отправлена команда: 0x{message.CmdWord1:04x}')
 
         ic(msp_RetrieveMessage(fr, msp_NEXT_MESSAGE, message))
-        
+
         recv_data = message.Data[:message.dataWordCount]
-        
+
         if not recv_data:
             log_message = f'<b>{next(self.log_counter)}</b>. Данные не получены'
             self.log_text.append(log_message)
             return
-        
+
         for widget, val in zip(self.output_le02, recv_data):
             widget.setText(f'{val}')
-            
+
         recv_data = [f'<b>0x{data:04x}</b>' for data in recv_data]
 
         log_message = f'<b>{next(self.log_counter)}</b>. Полученные данные: {":".join(recv_data)}'

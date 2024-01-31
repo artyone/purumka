@@ -114,7 +114,7 @@ class RTL:
         func.errcheck = self.lastErrorHandler
         return func(dev_handle, reg)
 
-    def writeReg(self, dev_handle: msp_DEVHANDLE, reg: msp_REGID, value: msp_WORD) -> msp_ERROR:
+    def writeReg(self, dev_handle: msp_DEVHANDLE, reg: int, value: int) -> msp_ERROR:
         func = self.lib.msp_WriteReg
         func.argtypes = [msp_DEVHANDLE, msp_REGID, msp_WORD]
         func.restype = msp_ERROR
