@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (QAction, QApplication, QComboBox, QHBoxLayout, QGri
                              QPushButton, QSlider, QStyle, QToolBar, QRadioButton,
                              QTreeWidget, QTreeWidgetItem, QVBoxLayout, QTextEdit,
                              QWidget, QLineEdit)
+from rtl import RTL
 
 
 class ClassWrapper:
@@ -37,13 +38,10 @@ class MainWindow(QMainWindow):
     def __init__(self, app):
         super().__init__()
         self.app = app
-        msp_Startup()
+        self.lib = RTL('./drtl3.dll')
+        self.lib.startUp()
         self.dev_handle = None
         self.log_counter = count(1)
-        self.RT = 4
-        self.SA = 1
-        self.wcnt = 2
-        self.cw = msp_BCCW_CHANNEL_A
         self.SU = 0b0000_0000_0000_0000
         self.activated = False
 
@@ -160,6 +158,7 @@ class MainWindow(QMainWindow):
             ('Точность установки блока по курсу', 'kurs_accuracy_bis_ledit'),
             ('Абсолютная высота полёта', 'absolute_height_bis_ledit'),
         ]
+        
         self.input_le = []
         positions = [(j, i) for i in range(2,4) for j in range(4)]
         for position, (header, val) in zip(positions, headers_params):
@@ -321,8 +320,7 @@ class MainWindow(QMainWindow):
             self.log_text.append(
                 f'<b>{next(self.log_counter)}</b>. Ошибка: {e}')
             return
-        self.activated = True
-        ic(msp_ReadReg(self.dev_handle, mspRR_EXTERNAL_USB_POWER))
+        
 
     def deactivate_device(self):
         if self.dev_handle is not None:
