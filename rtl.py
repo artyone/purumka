@@ -168,7 +168,7 @@ class RTL:
         func.argtypes = [msp_DEVHANDLE, msp_WORD, msp_WORD]
         func.restype = msp_FRMHANDLE
         func.errcheck = self.lastErrorHandler
-        return func(dev_handle, dev_handle, frame_time, message_count)
+        return func(dev_handle, frame_time, message_count)
 
     def destroyHandle(self, handle: msp_HANDLE) -> msp_ERROR:
         func = self.lib.msp_DestroyHandle

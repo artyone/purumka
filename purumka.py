@@ -368,13 +368,12 @@ class MainWindow(QMainWindow):
             )
             return
 
-        channel = msp_BCCW_CHANNEL_B if self.channel_combo_box.currentIndex() else msp_BCCW_CHANNEL_A
-
-        channel = msp_BCCW_CHANNEL_B if self.channel_combo_box.currentIndex() else msp_BCCW_CHANNEL_A
+        channel = msp_BCCW_CHANNEL_B if self.power_cmbbox.currentIndex() else msp_BCCW_CHANNEL_A
         data = [int(widget.text()) if widget.text()
                 else 0 for widget in self.to_diss_input]
         try:
-            message = self.lib.BCtoRT(msp_Message(), 4, 1, 7, data, channel)
+            message = msp_Message()
+            self.lib.BCtoRT(message, 4, 1, 7, data, channel)
             self.lib.addMessage(
                 fr,
                 self.lib.createMessage(
@@ -411,9 +410,10 @@ class MainWindow(QMainWindow):
             )
             return
 
-        channel = msp_BCCW_CHANNEL_B if self.channel_combo_box.currentIndex() else msp_BCCW_CHANNEL_A
+        channel = msp_BCCW_CHANNEL_B if self.power_cmbbox.currentIndex() else msp_BCCW_CHANNEL_A
         try:
-            message = self.lib.RTtoBC(msp_Message(), 4, 1, 8, channel)
+            message = msp_Message()
+            self.lib.RTtoBC(message, 4, 1, 8, channel)
             self.lib.addMessage(
                 fr,
                 self.lib.createMessage(
@@ -438,6 +438,10 @@ class MainWindow(QMainWindow):
         self.lib.retrieveMessage(fr, msp_NEXT_MESSAGE, message)
 
         recv_data = message.Data[:message.dataWordCount]
+
+        recv_data = [
+            22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34
+        ]
 
         if not recv_data:
             log_message = f'<b>{next(self.log_counter)}</b>. Данные не получены'
@@ -470,9 +474,10 @@ class MainWindow(QMainWindow):
             )
             return
 
-        channel = msp_BCCW_CHANNEL_B if self.channel_combo_box.currentIndex() else msp_BCCW_CHANNEL_A
+        channel = msp_BCCW_CHANNEL_B if self.power_cmbbox.currentIndex() else msp_BCCW_CHANNEL_A
         try:
-            message = self.lib.RTtoBC(msp_Message(), 4, 2, 11, channel)
+            message = msp_Message()
+            self.lib.RTtoBC(message, 4, 2, 11, channel)
             self.lib.addMessage(
                 fr,
                 self.lib.createMessage(
@@ -518,7 +523,7 @@ class MainWindow(QMainWindow):
             )
             return
         try:
-            fr = self.lib.createFrame(self.dev_handle, 1000, 2)
+            fr = self.lib.createFrame(self.dev_handle, 1000, 1)
             return fr
         except Exception as e:
             self.log_text.append(
