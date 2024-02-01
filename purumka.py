@@ -5,8 +5,6 @@ import time
 from functools import partial
 from itertools import count, cycle
 
-import numpy as np
-from icecream import ic
 from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtNetwork import QUdpSocket
@@ -22,12 +20,54 @@ from msp_flags import *
 from msp_fucntions import *
 from msp_types import *
 from rtl import RTL
+import numpy as np
+
+class MainData:
+    headers = [
+        'identificator', 
+        'ss', 
+        'wx', 
+        'wy', 
+        'wz', 
+        'wp', 
+        'us', 
+        'time'
+    ]
+    def __init__(self):
+        self.data = []
+
+    def get_obj(self, name):
+        return self.data[self.headers.index(name)::8]
+
+    def add_data(self, data):
+        if len(self.data) > len(self.headers) * 200_000_000:
+            self.data = self.data[len(self.headers) * 100_000_000:]
+        self.data.extend(data)
+
+    def get_last(self):
+        return self.data[-8:]
+
+class ClassWrapper:
+    def __init__(self, device_info):
+        self.fields = [name[0]
+                       for name in getattr(type(device_info), '_fields_')]
+        for field in self.fields:
+            setattr(self, field, getattr(device_info, field))
+
+    def __str__(self):
+        res = [f'{field}: {getattr(self, field)}' for field in self.fields]
+        return ' '.join(res)
+
+class GraphWindow(QMainWindow):
+    def __init__(self, main_window):
+        super().__init__()
 
 
 class MainWindow(QMainWindow):
     def __init__(self, app):
         super().__init__()
         self.app = app
+        self.data = MainData()
 
         self.dev_handle = None
         self.log_counter = count(1)
@@ -35,6 +75,7 @@ class MainWindow(QMainWindow):
 
         try:
             self.lib = RTL('./drtl3.dll')
+            self.lib.startUp()
         except Exception as e:
             QMessageBox.warning(
                 self, 'Ошибка', 'Не обнаружено устройство. ' + str(e))
@@ -82,18 +123,7 @@ class MainWindow(QMainWindow):
 
         self.dev_cmbbox = QComboBox()
         self.upd_dev_cmbbox()
-        self.dev_cmbbox.activated.connect(self.deactivate_dev)
         blk_layout.addWidget(self.dev_cmbbox)
-
-        activate_btn = QPushButton('Подключить')
-        activate_btn.setFixedWidth(100)
-        activate_btn.clicked.connect(self.activate_dev)
-        blk_layout.addWidget(activate_btn)
-
-        deactivate_btn = QPushButton('Отключить')
-        deactivate_btn.setFixedWidth(100)
-        deactivate_btn.clicked.connect(self.deactivate_dev)
-        blk_layout.addWidget(deactivate_btn)
 
         self.chl_cmbbox = QComboBox()
         self.chl_cmbbox.addItems(['Шина А', 'Шина Б'])
@@ -101,9 +131,9 @@ class MainWindow(QMainWindow):
         blk_layout.addWidget(self.chl_cmbbox)
 
         self.power_cmbbox = QComboBox()
-        self.power_cmbbox.addItems(['Питание Внешнее', 'Питание Внутренее'])
+        self.power_cmbbox.addItems(['Питание Внутренее', 'Питание Внешнее'])
         self.power_cmbbox.setFixedWidth(150)
-        self.power_cmbbox.activated.connect(self.activate_dev)
+        self.power_cmbbox.activated.connect(self.deactivate_dev)
         blk_layout.addWidget(self.power_cmbbox)
 
     def upd_dev_cmbbox(self):
@@ -296,34 +326,9 @@ class MainWindow(QMainWindow):
             finally:
                 self.dev_handle = None
 
-        try:
-            self.dev_handle = self.lib.open(self.dev_cmbbox.currentIndex())
-            if self.dev_handle:
-                self.log_text.append(
-                    f'<b>{next(self.log_counter)}</b>. Устройство подключено</b>'
-                )
-            else:
-                self.log_text.append(
-                    f'<b>{next(self.log_counter)}</b>. Ошибка подключения устройства')
-                self.upd_dev_cmbbox()
-                self.dev_handle = None
-                return
-        except Exception as e:
-            self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Произошла ошибка подключения: {e}')
-            return
-
-        try:
-            power = 0 if self.power_cmbbox.currentIndex() else 1
-            self.lib.writeReg(self.dev_handle, mspRR_EXTERNAL_USB_POWER, power)
-        except Exception as e:
-            self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Произошла ошибка установки питания: {e}'
-            )
-            self.dev_handle = None
-            self.upd_dev_cmbbox()
-            return
-
+        self.dev_handle = self.lib.open(self.dev_cmbbox.currentIndex())
+        power = self.power_cmbbox.currentIndex()
+        self.lib.writeReg(self.dev_handle, mspRR_EXTERNAL_USB_POWER, power)
         bcflags = [
             mspF_ENHANCED_MODE,
             mspF_256WORD_BOUNDARY_DISABLE,
@@ -331,47 +336,41 @@ class MainWindow(QMainWindow):
             mspF_INTERNAL_TRIGGER_ENABLED,
             mspF_EXPANDED_BC_CONTROL_WORD,
         ]
-        try:
-            self.lib.configure(
-                self.dev_handle,
-                msp_MODE_BC + msp_MODE_ENHANCED,
-                bcflags,
-                None
-            )
-            self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Устройство настроено в режим КШ-ОУ')
-        except Exception as e:
-            self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Ошибка настройки режима: {e}')
-            self.dev_handle = None
-            self.upd_dev_cmbbox()
-            return
-
-    def deactivate_dev(self):
-        if self.dev_handle is not None:
-            try:
-                self.lib.reset(self.dev_handle)
-                self.lib.close(self.dev_handle)
-            except:
-                pass
-            finally:
-                self.dev_handle = None
-        self.log_text.append(
-            f'<b>{next(self.log_counter)}</b>. Устройство отключено.'
+        self.lib.configure(
+            self.dev_handle,
+            msp_MODE_BC + msp_MODE_ENHANCED,
+            bcflags,
+            None
         )
 
+    def deactivate_dev(self):
+        try:
+            self.lib.reset(self.dev_handle)
+            self.lib.close(self.dev_handle)
+        except:
+            pass
+        finally:
+            self.dev_handle = None
+
     def send_to_diss(self):
-        fr = self.get_frame()
-        if not fr:
+        try:
+            self.activate_dev()
+        except Exception as e:
             self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Не удалось создать фрейм'
-            )
+                f'<b>{next(self.log_counter)}</b>. Произошла ошибка подключения к устройству: {e}. Попробуйте выбрать другое или выключить другие программы по работе с ним.')
+            self.deactivate_dev()
             return
 
-        channel = msp_BCCW_CHANNEL_B if self.power_cmbbox.currentIndex() else msp_BCCW_CHANNEL_A
-        data = [int(widget.text()) if widget.text()
-                else 0 for widget in self.to_diss_input]
         try:
+            fr = self.lib.createFrame(self.dev_handle, 1000, 1)
+            channel = msp_BCCW_CHANNEL_B if self.chl_cmbbox.currentIndex() else msp_BCCW_CHANNEL_A
+            if self.to_diss_hex_chkbox.isChecked():
+                data = [int(widget.text(), base=16) if widget.text() else 0 
+                        for widget in self.to_diss_input]
+            else:
+                data = [int(widget.text()) if widget.text() else 0 
+                        for widget in self.to_diss_input]
+
             message = msp_Message()
             self.lib.BCtoRT(message, 4, 1, 7, data, channel)
             self.lib.addMessage(
@@ -382,74 +381,51 @@ class MainWindow(QMainWindow):
                 ),
                 1000
             )
+            self.lib.loadFrame(fr, msp_AUTOREPEAT)
+            self.lib.start(self.dev_handle)
+            self.log_text.append(
+                f'<b>{next(self.log_counter)}</b>. Отправлена команда: 0x{message.CmdWord1:04x}')
+            self.lib.retrieveMessage(fr, msp_NEXT_MESSAGE, message)
+
+            recv_data = message.Data[:message.dataWordCount]
+            recv_data = [f'<b>0x{data:04x}</b>' for data in recv_data]
+
+            log_message = f'<b>{next(self.log_counter)}</b>. Отправленные данные: {":".join(recv_data)}'
+            self.log_text.append(log_message)
+            if not message.StatusWord1:
+                raise ValueError('Ответ не получен')
+            else:
+                log_message = f'<b>{next(self.log_counter)}</b>. Получен ответ: 0x{message.StatusWord1:04x}'
+                self.log_text.append(log_message)
         except Exception as e:
             self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Ошибка создания сообщения: {e}'
+                f'<b>{next(self.log_counter)}</b>. Ошибка отправки: {e}'
             )
-            return
-
-        self.lib.loadFrame(fr, msp_AUTOREPEAT)
-        self.lib.start(self.dev_handle)
-        self.log_text.append(
-            f'<b>{next(self.log_counter)}</b>. Отправлена команда: 0x{message.CmdWord1:04x}')
-        recv_data = message.Data[:message.dataWordCount]
-        if not recv_data:
-            log_message = f'<b>{next(self.log_counter)}</b>. Данные не доставлены.'
-            self.log_text.append(log_message)
-            return
-        recv_data = [f'<b>0x{data:04x}</b>' for data in recv_data]
-
-        log_message = f'<b>{next(self.log_counter)}</b>. Отправленные данные: {":".join(recv_data)}'
-        self.log_text.append(log_message)
+        finally:
+            self.deactivate_dev()
 
     def send_to_bis01(self):
-        fr = self.get_frame()
-        if not fr:
-            self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Не удалось создать фрейм'
-            )
-            return
-
-        channel = msp_BCCW_CHANNEL_B if self.power_cmbbox.currentIndex() else msp_BCCW_CHANNEL_A
         try:
-            message = msp_Message()
-            self.lib.RTtoBC(message, 4, 1, 8, channel)
-            self.lib.addMessage(
-                fr,
-                self.lib.createMessage(
-                    self.dev_handle,
-                    message
-                ),
-                1000
-            )
+            self.activate_dev()
         except Exception as e:
             self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Ошибка создания сообщения: {e}'
+                f'<b>{next(self.log_counter)}</b>. Произошла ошибка подключения к устройству: {e}. Попробуйте выбрать другое или выключить другие программы по работе с ним.')
+            self.deactivate_dev()
+            return
+        
+        try:
+            recv_data = self.recieve_data(1, 8, 1)
+        except Exception as e:
+            self.log_text.append(
+                f'<b>{next(self.log_counter)}</b>. Ошибка получения сообщения: {e}'
             )
             return
-
-        self.lib.loadFrame(fr, msp_AUTOREPEAT)
-
-        self.lib.start(self.dev_handle)
-
-        self.log_text.append(
-            f'<b>{next(self.log_counter)}</b>. Отправлена команда: 0x{message.CmdWord1:04x}')
-
-        self.lib.retrieveMessage(fr, msp_NEXT_MESSAGE, message)
-
-        recv_data = message.Data[:message.dataWordCount]
-
-        recv_data = [
-            22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34
-        ]
-
-        if not recv_data:
-            log_message = f'<b>{next(self.log_counter)}</b>. Данные не получены'
-            self.log_text.append(log_message)
-            return
+        finally:
+            self.deactivate_dev()
 
         for widget, val in zip(self.to_bis01_input, recv_data):
-            widget.setText(f'{val}')
+            string = f'{val:04X}' if self.to_bis01_hex_chkbox.isChecked() else f'{val}'
+            widget.setText(string)
 
         for widget, mask in self.to_biss_chkbox.items():
             if recv_data[1] & mask != 0:
@@ -461,78 +437,67 @@ class MainWindow(QMainWindow):
                 widget.setChecked(False)
                 widget.setDisabled(True)
 
-        recv_data = [f'<b>0x{data:04x}</b>' for data in recv_data]
-
-        log_message = f'<b>{next(self.log_counter)}</b>. Полученные данные: {":".join(recv_data)}'
-        self.log_text.append(log_message)
-
     def send_to_bis02(self):
-        fr = self.get_frame()
-        if not fr:
-            self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Не удалось создать фрейм'
-            )
-            return
-
-        channel = msp_BCCW_CHANNEL_B if self.power_cmbbox.currentIndex() else msp_BCCW_CHANNEL_A
         try:
-            message = msp_Message()
-            self.lib.RTtoBC(message, 4, 2, 11, channel)
-            self.lib.addMessage(
-                fr,
-                self.lib.createMessage(
-                    self.dev_handle,
-                    message
-                ),
-                1000
-            )
+            self.activate_dev()
         except Exception as e:
             self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Ошибка создания сообщения: {e}'
+                f'<b>{next(self.log_counter)}</b>. Произошла ошибка подключения к устройству: {e}. Попробуйте выбрать другое или выключить другие программы по работе с ним.')
+            self.deactivate_dev()
+            return
+        try:
+            recv_data = self.recieve_data(2, 11, 1)
+        except Exception as e:
+            self.log_text.append(
+                f'<b>{next(self.log_counter)}</b>. Ошибка получения сообщения: {e}'
             )
             return
+        finally:
+            self.deactivate_dev()
 
+        for widget, val in zip(self.to_bis02_input, recv_data):
+            string = f'{val:04X}' if self.to_bis02_hex_chkbox.isChecked() else f'{val}'
+            widget.setText(string)
+
+    def recieve_data(self, address, words, count):
+        fr = self.lib.createFrame(self.dev_handle, 1000, 1)
+        channel = msp_BCCW_CHANNEL_B if self.chl_cmbbox.currentIndex() else msp_BCCW_CHANNEL_A
+
+        message = msp_Message()
+        self.lib.addMessage(
+            fr,
+            self.lib.createMessage(
+                self.dev_handle,
+                self.lib.RTtoBC(message, 4, address, words, channel)
+            ),
+            1000
+        )
         self.lib.loadFrame(fr, msp_AUTOREPEAT)
 
         self.lib.start(self.dev_handle)
 
         self.log_text.append(
             f'<b>{next(self.log_counter)}</b>. Отправлена команда: 0x{message.CmdWord1:04x}')
-
-        self.lib.retrieveMessage(fr, msp_NEXT_MESSAGE, message)
-
-        recv_data = message.Data[:message.dataWordCount]
-
-        if not recv_data:
-            log_message = f'<b>{next(self.log_counter)}</b>. Данные не получены'
+        while count != 0:
+            self.lib.retrieveMessage(fr, msp_NEXT_MESSAGE, message)
+            if not message.StatusWord1:
+                raise RuntimeError('Данные не получены')
+            recv_data = message.Data[:message.dataWordCount]
+            if not recv_data:
+                continue
+            log_data = [f'<b>0x{data:04x}</b>' for data in recv_data]
+            log_message = f'<b>{next(self.log_counter)}</b>. Полученные данные: {":".join(log_data)}'
             self.log_text.append(log_message)
-            return
+            time.sleep(0.008)
+            count -= 1
+        return recv_data
 
-        for widget, val in zip(self.to_bis02_input, recv_data):
-            widget.setText(f'{val}')
-
-        recv_data = [f'<b>0x{data:04x}</b>' for data in recv_data]
-
-        log_message = f'<b>{next(self.log_counter)}</b>. Полученные данные: {":".join(recv_data)}'
-        self.log_text.append(log_message)
-
-    def get_frame(self):
-        if self.dev_handle is None:
-            self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Устройство не подключено'
-            )
-            return
-        try:
-            fr = self.lib.createFrame(self.dev_handle, 1000, 1)
-            return fr
-        except Exception as e:
-            self.log_text.append(
-                f'<b>{next(self.log_counter)}</b>. Ошибка создания фрейма: {e}'
-            )
-            return None
+    def make_graph(self):
+        ...
 
     def closeEvent(self, event):
         self.deactivate_dev()
+        self.lib.cleanup()
         super().closeEvent(event)
 
 

@@ -5,8 +5,6 @@ import time
 from functools import partial
 from itertools import count, cycle
 
-import numpy as np
-from icecream import ic
 from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtNetwork import QUdpSocket
@@ -464,8 +462,6 @@ class MainWindow(QMainWindow):
 
         channel = msp_BCCW_CHANNEL_B if self.channel_combo_box.currentIndex() else msp_BCCW_CHANNEL_A
 
-        ic(channel)
-
         msp_AddMessage(
             fr,
             msp_CreateMessage(
@@ -481,8 +477,6 @@ class MainWindow(QMainWindow):
 
         self.log_text.append(
             f'<b>{next(self.log_counter)}</b>. Отправлена команда: 0x{message.CmdWord1:04x}')
-
-        ic(msp_RetrieveMessage(fr, msp_NEXT_MESSAGE, message))
 
         recv_data = message.Data[:message.dataWordCount]
 
@@ -529,8 +523,6 @@ class MainWindow(QMainWindow):
 
         channel = msp_BCCW_CHANNEL_B if self.channel_combo_box.currentIndex() else msp_BCCW_CHANNEL_A
 
-        ic(channel)
-
         msp_AddMessage(
             fr,
             msp_CreateMessage(
@@ -546,8 +538,6 @@ class MainWindow(QMainWindow):
 
         self.log_text.append(
             f'<b>{next(self.log_counter)}</b>. Отправлена команда: 0x{message.CmdWord1:04x}')
-
-        ic(msp_RetrieveMessage(fr, msp_NEXT_MESSAGE, message))
 
         recv_data = message.Data[:message.dataWordCount]
 

@@ -8,7 +8,6 @@ class RTL:
     def __init__(self, filepath):
         self.filepath = filepath
         self.lib = CDLL(f'{filepath}')
-        self.startUp()
 
     @staticmethod
     def getError(result, func, args):
@@ -373,7 +372,7 @@ class RTL:
         func = self.lib.msp_RetrieveMessage
         func.argtypes = [msp_STKHANDLE, c_int, POINTER(msp_Message)]
         func.restype = msp_ERROR
-        func.errcheck = self.getError
+        # func.errcheck = self.getError
         return func(stack, entry, message)
     
     def getCurrentEntry(self, stack: msp_STKHANDLE, option: int) -> c_int:
