@@ -306,15 +306,17 @@ class MainWindow(QMainWindow):
 
     def convert_to_hex(self, chkbox, widgets):
         for widget in widgets:
-            if widget.text() == '':
+            widget_text = widget.text()
+            if not widget_text:
                 continue
-            if chkbox.isChecked():
-                try:
-                    widget.setText(f'{int(widget.text()):04X}')
-                except ValueError:
-                    pass
-            else:
-                widget.setText(str(int(widget.text(), base=16)))
+            try:
+                if chkbox.isChecked():
+                    text = f'{int(widget_text):04X}'
+                else:
+                    text = f'{int(widget_text, base=16)}'
+                widget.setText(text)
+            except ValueError:
+                pass
 
     def activate_dev(self):
         if self.dev_handle is not None:
