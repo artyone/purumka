@@ -21,18 +21,21 @@ from msp_fucntions import *
 from msp_types import *
 from rtl import RTL
 import numpy as np
+import binascii
+
 
 class MainData:
     headers = [
-        'identificator', 
-        'ss', 
-        'wx', 
-        'wy', 
-        'wz', 
-        'wp', 
-        'us', 
+        'identificator',
+        'ss',
+        'wx',
+        'wy',
+        'wz',
+        'wp',
+        'us',
         'time'
     ]
+
     def __init__(self):
         self.data = []
 
@@ -47,6 +50,7 @@ class MainData:
     def get_last(self):
         return self.data[-8:]
 
+
 class ClassWrapper:
     def __init__(self, device_info):
         self.fields = [name[0]
@@ -57,6 +61,7 @@ class ClassWrapper:
     def __str__(self):
         res = [f'{field}: {getattr(self, field)}' for field in self.fields]
         return ' '.join(res)
+
 
 class GraphWindow(QMainWindow):
     def __init__(self, main_window):
@@ -95,19 +100,19 @@ class MainWindow(QMainWindow):
         self.init_device_block()
 
         self.init_to_diss_block()
-        to_diss_btn = QPushButton('Отправить из БИС в ДИСС')
+        to_diss_btn = QPushButton('Отправить в ДИСС')
         to_diss_btn.clicked.connect(self.send_to_diss)
         self.main_layout.addWidget(to_diss_btn)
 
         self.init_to_bis01_block()
         to_bis01_btn = QPushButton(
-            'Получить из БИС подадрес 01')
+            'Получить из ДИСС подадрес 01')
         to_bis01_btn.clicked.connect(self.send_to_bis01)
         self.main_layout.addWidget(to_bis01_btn)
 
         self.init_to_bis02_block()
         to_bis02_btn = QPushButton(
-            'Получить из БИС подадрес 02')
+            'Получить из ДИСС подадрес 02')
         to_bis02_btn.clicked.connect(self.send_to_bis02)
         self.main_layout.addWidget(to_bis02_btn)
 
@@ -161,40 +166,49 @@ class MainWindow(QMainWindow):
             ("Запрет излучения",                 0b0000_0000_0000_0001)
         ]
         positions = [(j, i) for i in range(2) for j in range(4)]
+        self.to_diss_chkbox = {}
         for position, (header, val) in zip(positions, headers_su):
             chkbx = QCheckBox(header)
             chkbx.setFixedWidth(250)
             box_layout.addWidget(chkbx, *position)
             chkbx.clicked.connect(partial(self.su_clicked_chkbox, val))
+            self.to_diss_chkbox[chkbx] = val
 
-        headers_params = [
-            'Слово управления',
-            'Угол крена',
-            'Угол тангажа',
-            'Точность установки блока по крену',
-            'Точность установки блока по тангажу',
-            'Точность установки блока по курсу',
-            'Абсолютная высота полёта',
+        self.to_diss_elems = [
+            {'name': 'Слово управления', 'coef': 1, 'signed': False, 'func': self.change_su_widgets},
+            {'name': 'Угол крена', 'coef': 360 / (2 ** 16), 'signed': True},
+            {'name': 'Угол тангажа', 'coef': 360 / (2 ** 16), 'signed': True},
+            {'name': 'Точность установки блока по крену',
+                'coef': 360 / (2 ** 16), 'signed': True},
+            {'name': 'Точность установки блока по тангажу',
+                'coef': 360 / (2 ** 16), 'signed': True},
+            {'name': 'Точность установки блока по курсу',
+                'coef': 360 / (2 ** 16), 'signed': True},
+            {'name': 'Абсолютная высота полёта', 'coef': 1, 'signed': True},
         ]
-        self.to_diss_input = []
         positions = [(j, i) for i in range(2, 4) for j in range(4)]
-        for position, header in zip(positions, headers_params):
+        for position, elem in zip(positions, self.to_diss_elems):
             layout = QHBoxLayout()
             le = QLineEdit()
             le.setFixedWidth(100)
-            le.setToolTip(header)
-            label = QLabel(header)
+            le.setToolTip(elem['name'])
+            label = QLabel(elem['name'])
             label.setFixedWidth(250)
             layout.addWidget(le)
             layout.addWidget(label)
             box_layout.addLayout(layout, *position)
-            self.to_diss_input.append(le)
+            elem['widget'] = le
+            if 'func' in elem:
+                le.textChanged.connect(partial(elem['func'], le))
 
         box_layout.setColumnStretch(5, 1)
         self.to_diss_hex_chkbox = QCheckBox('значение в HEX')
         self.to_diss_hex_chkbox.clicked.connect(
-            partial(self.convert_to_hex, self.to_diss_hex_chkbox, self.to_diss_input))
+            partial(self.convert_to_hex, self.to_diss_hex_chkbox, self.to_diss_elems))
         box_layout.addWidget(self.to_diss_hex_chkbox, 0, 6)
+        # self.to_diss_elems[0]['widget'].textChanged.connect(
+        #     self.change_su_widgets)
+
         self.main_layout.addWidget(group_box)
 
     def init_to_bis01_block(self):
@@ -207,12 +221,12 @@ class MainWindow(QMainWindow):
             ('Отказ УСК',        0b0000_0000_0100_0000),
             ('Отказ МПП',        0b0000_0000_0010_0000),
             ('Отказ УС',         0b0000_0000_0001_0000),
-            ('Исправность',      0b0000_0000_0000_1000),
+            ('Исправность (0 - исправность, 1 - отказ)',      0b0000_0000_0000_1000),
             ('Память',           0b0000_0000_0000_0100),
             ('Контроль',         0b0000_0000_0000_0010),
             ('Запрет излучения', 0b0000_0000_0000_0001)
         ]
-        positions = [(j, i) for i in range(2) for j in range(4)]
+        positions = [(j, i) for i in range(2) for j in range(5)]
         self.to_biss_chkbox = {}
         for position, (header, mask) in zip(positions, headers_ss):
             chkbx = QCheckBox(header)
@@ -221,36 +235,41 @@ class MainWindow(QMainWindow):
             box_layout.addWidget(chkbx, *position)
             self.to_biss_chkbox[chkbx] = mask
 
-        headers_params = [
-            'Идентификатор массива',
-            'Слово состояния',
-            'Продольная составляющая вектора скорости',
-            'Вертикальная составляющая вектора скорости',
-            'Поперечная составляющая вектора скорости',
-            'Путевая скорость',
-            'Угол сноса',
-            'Время наработки',
+        self.to_bis01_elems = [
+            {'name': 'Идентификатор массива', 'coef': 1, 'signed': False},
+            {'name': 'Слово состояния', 'coef': 1, 'signed': False, 'func': self.send_to_bis01_checkboxes},
+            {'name': 'Продольная составляющая вектора скорости',
+                'coef': 4096 / 2 ** 16, 'signed': False},
+            {'name': 'Вертикальная составляющая вектора скорости',
+                'coef': 256 / 2 ** 15, 'signed': True},
+            {'name': 'Поперечная составляющая вектора скорости',
+                'coef': 256 / 2 ** 15, 'signed': True},
+            {'name': 'Путевая скорость', 'coef': 4096 / 2 ** 16, 'signed': False},
+            {'name': 'Угол сноса', 'coef': 360 / (2 ** 16), 'signed': True},
+            {'name': 'Время наработки', 'coef': 1, 'signed': False}
         ]
-        self.to_bis01_input = []
-        positions = [(j, i) for i in range(2, 4) for j in range(4)]
-        for position, header in zip(positions, headers_params):
+
+        positions = [(j, i) for i in range(2, 4) for j in range(5)]
+        for position, elem in zip(positions, self.to_bis01_elems):
             layout = QHBoxLayout()
             le = QLineEdit()
             le.setDisabled(True)
             le.setFixedWidth(100)
-            le.setToolTip(header)
-            label = QLabel(header)
+            le.setToolTip(elem['name'])
+            label = QLabel(elem['name'])
             label.setFixedWidth(250)
             layout.addWidget(le)
             layout.addWidget(label)
             box_layout.addLayout(layout, *position)
-            self.to_bis01_input.append(le)
+            elem['widget'] = le
+            if 'func' in elem:
+                le.textChanged.connect(partial(elem['func'], le))
 
         box_layout.setColumnStretch(5, 1)
 
         self.to_bis01_hex_chkbox = QCheckBox('значение в HEX')
         self.to_bis01_hex_chkbox.clicked.connect(
-            partial(self.convert_to_hex, self.to_bis01_hex_chkbox, self.to_bis01_input))
+            partial(self.convert_to_hex, self.to_bis01_hex_chkbox, self.to_bis01_elems))
         box_layout.addWidget(self.to_bis01_hex_chkbox, 0, 6)
 
         self.main_layout.addWidget(group_box)
@@ -259,42 +278,60 @@ class MainWindow(QMainWindow):
         group_box = QGroupBox('Массив параметров из ДИСС в БИС подадрес 2')
         box_layout = QGridLayout(group_box)
 
-        headers_params = [
-            'Версия ПМО',
-            'Дата ПМО',
-            'Контрольная сумма ПМО1',
-            'Контрольная сумма ПМО2',
-            'Контрольная сумма ПМО3',
-            'Контрольная сумма ПМО4',
-            'Контрольная сумма ПМО5',
-            'Контрольная сумма ПМО6',
-            'Контрольная сумма ПМО7',
-            'Контрольная сумма ПМО8',
-            'Серий номер изделия'
+        self.to_bis02_elems = [
+            {'name': 'Версия ПМО', 'coef': 1, 'signed': False},
+            {'name': 'Дата ПМО', 'coef': 1, 'signed': False, 'func': self.int_to_date},
+            {'name': 'Контрольная сумма ПМО1', 'coef': 1, 'signed': False},
+            {'name': 'Контрольная сумма ПМО2', 'coef': 1, 'signed': False},
+            {'name': 'Контрольная сумма ПМО3', 'coef': 1, 'signed': False},
+            {'name': 'Контрольная сумма ПМО4', 'coef': 1, 'signed': False},
+            {'name': 'Контрольная сумма ПМО5', 'coef': 1, 'signed': False},
+            {'name': 'Контрольная сумма ПМО6', 'coef': 1, 'signed': False},
+            {'name': 'Контрольная сумма ПМО7', 'coef': 1, 'signed': False},
+            {'name': 'Контрольная сумма ПМО8', 'coef': 1, 'signed': False},
+            {'name': 'Серий номер изделия', 'coef': 1, 'signed': False}
         ]
+
         self.to_bis02_input = []
         positions = [(j, i) for i in range(4) for j in range(4)]
-        for position, header in zip(positions, headers_params):
+        for position, elem in zip(positions, self.to_bis02_elems):
             layout = QHBoxLayout()
             le = QLineEdit()
             le.setDisabled(True)
             le.setFixedWidth(100)
-            le.setToolTip(header)
-            label = QLabel(header)
+            le.setToolTip(elem['name'])
+            label = QLabel(elem['name'])
             label.setFixedWidth(250)
             layout.addWidget(le)
             layout.addWidget(label)
             box_layout.addLayout(layout, *position)
-            self.to_bis02_input.append(le)
+            elem['widget'] = le
+            if 'func' in elem:
+                le.textChanged.connect(partial(elem['func'], le))
 
         box_layout.setColumnStretch(4, 1)
 
         self.to_bis02_hex_chkbox = QCheckBox('значение в HEX')
         self.to_bis02_hex_chkbox.clicked.connect(
-            partial(self.convert_to_hex, self.to_bis02_hex_chkbox, self.to_bis02_input))
+            partial(self.convert_to_hex, self.to_bis02_hex_chkbox, self.to_bis02_elems))
         box_layout.addWidget(self.to_bis02_hex_chkbox, 0, 6)
 
         self.main_layout.addWidget(group_box)
+
+    def change_su_widgets(self, data_widget):
+        widget_text = data_widget.text() 
+        if not widget_text:
+            widget_text = 0
+            self.to_diss_elems[0]['widget'].setText('0')
+        if self.to_diss_hex_chkbox.isChecked():
+            self.SU = int(widget_text, 16)
+        else:
+            self.SU = int(widget_text)
+        for widget, mask in self.to_diss_chkbox.items():
+            if self.SU & mask:
+                widget.setChecked(True)
+            else:
+                widget.setChecked(False)
 
     def su_clicked_chkbox(self, val):
         self.SU ^= val
@@ -302,21 +339,48 @@ class MainWindow(QMainWindow):
             text = f'{self.SU:04X}'
         else:
             text = f'{self.SU}'
-        self.to_diss_input[0].setText(text)
+        self.to_diss_elems[0]['widget'].setText(text)
 
-    def convert_to_hex(self, chkbox, widgets):
-        for widget in widgets:
-            widget_text = widget.text()
+    def convert_to_hex(self, chkbox, elems):
+        for elem in elems:
+            elem['widget'].blockSignals(True)
+            widget_text = elem['widget'].text()
             if not widget_text:
                 continue
             try:
                 if chkbox.isChecked():
-                    text = f'{int(widget_text):04X}'
+                    val = round(float(widget_text) / elem['coef'])
+                    val = val.to_bytes(length=2, signed=elem['signed'])
+                    text = f'{val.hex().upper()}'
                 else:
-                    text = f'{int(widget_text, base=16)}'
-                widget.setText(text)
-            except ValueError:
-                pass
+                    byte_value = binascii.unhexlify(widget_text)
+                    val = int.from_bytes(
+                        byte_value, byteorder="big", signed=elem['signed'])
+                    text = f'{round(val * elem["coef"], 2)}'
+            except:
+                if '.' in widget_text:
+                    text = widget_text
+                else:
+                    text = '0'
+
+            elem['widget'].setText(text)
+            elem['widget'].blockSignals(False)
+
+    def int_to_date(self, data_widget: QLineEdit):
+        data_widget.blockSignals(True)
+        try:
+            num = int(data_widget.text(), 16)
+            year = str(num >> 9).zfill(4)
+            month = str((num >> 5) & 0x0F).zfill(2)
+            day = str(num & 0x1F).zfill(2)
+            data_widget.setText(f'{day}.{month}.{year}')
+        except:
+            day, month, year = [int(x) for x in data_widget.text().split('.')]
+            num = (year << 9) + (month << 5) + day
+            data_widget.setText(f'{num:04X}')
+        data_widget.blockSignals(False)
+
+        
 
     def activate_dev(self):
         if self.dev_handle is not None:
@@ -366,12 +430,16 @@ class MainWindow(QMainWindow):
         try:
             fr = self.lib.createFrame(self.dev_handle, 1000, 1)
             channel = msp_BCCW_CHANNEL_B if self.chl_cmbbox.currentIndex() else msp_BCCW_CHANNEL_A
-            if self.to_diss_hex_chkbox.isChecked():
-                data = [int(widget.text(), base=16) if widget.text() else 0 
-                        for widget in self.to_diss_input]
-            else:
-                data = [int(widget.text()) if widget.text() else 0 
-                        for widget in self.to_diss_input]
+            data = []
+            for elem in self.to_diss_elems:
+                if not elem['widget'].text():
+                    data.append(0)
+                    continue
+                if self.to_diss_hex_chkbox.isChecked():
+                    data.append(int(elem['widget'].text(), base=16))
+                else:
+                    data.append(
+                        round(float(elem['widget'].text()) / elem['coef']))
 
             message = msp_Message()
             self.lib.BCtoRT(message, 4, 1, 7, data, channel)
@@ -414,7 +482,7 @@ class MainWindow(QMainWindow):
                 f'<b>{next(self.log_counter)}</b>. Произошла ошибка подключения к устройству: {e}. Попробуйте выбрать другое или выключить другие программы по работе с ним.')
             self.deactivate_dev()
             return
-        
+
         try:
             recv_data = self.recieve_data(1, 8, 1)
         except Exception as e:
@@ -425,12 +493,18 @@ class MainWindow(QMainWindow):
         finally:
             self.deactivate_dev()
 
-        for widget, val in zip(self.to_bis01_input, recv_data):
-            string = f'{val:04X}' if self.to_bis01_hex_chkbox.isChecked() else f'{val}'
-            widget.setText(string)
+        # recv_data = [0, 257,2,3,4,5,6,7]
 
+        for elem, val in zip(self.to_bis01_elems, recv_data):
+            string = f'{val:04X}' if self.to_bis01_hex_chkbox.isChecked(
+            ) else f'{round(val * elem["coef"], 2)}'
+            elem['widget'].setText(string)
+
+
+    def send_to_bis01_checkboxes(self, data_widget):
+        data_widget_value = int(data_widget.text())
         for widget, mask in self.to_biss_chkbox.items():
-            if recv_data[1] & mask != 0:
+            if int(data_widget_value) & mask != 0:
                 widget.setDisabled(False)
                 widget.setChecked(True)
                 widget.setDisabled(True)
@@ -457,9 +531,11 @@ class MainWindow(QMainWindow):
         finally:
             self.deactivate_dev()
 
-        for widget, val in zip(self.to_bis02_input, recv_data):
-            string = f'{val:04X}' if self.to_bis02_hex_chkbox.isChecked() else f'{val}'
-            widget.setText(string)
+        # recv_data = [0, 257,2,3,4,5,6,7]
+        for elem, val in zip(self.to_bis02_elems, recv_data):
+            string = f'{val:04X}' if self.to_bis02_hex_chkbox.isChecked(
+            ) else f'{round(val * elem["coef"], 2)}'
+            elem['widget'].setText(string)
 
     def recieve_data(self, address, words, count):
         fr = self.lib.createFrame(self.dev_handle, 1000, 1)
