@@ -175,7 +175,8 @@ class MainWindow(QMainWindow):
             self.to_diss_chkbox[chkbx] = val
 
         self.to_diss_elems = [
-            {'name': 'Слово управления', 'coef': 1, 'signed': False, 'func': self.change_su_widgets},
+            {'name': 'Слово управления', 'coef': 1,
+                'signed': False, 'func': self.change_su_widgets},
             {'name': 'Угол крена', 'coef': 360 / (2 ** 16), 'signed': True},
             {'name': 'Угол тангажа', 'coef': 360 / (2 ** 16), 'signed': True},
             {'name': 'Точность установки блока по крену',
@@ -237,7 +238,9 @@ class MainWindow(QMainWindow):
 
         self.to_bis01_elems = [
             {'name': 'Идентификатор массива', 'coef': 1, 'signed': False},
-            {'name': 'Слово состояния', 'coef': 1, 'signed': False, 'func': self.send_to_bis01_checkboxes},
+            {'name': 'Слово состояния', 'coef': 1, 'signed': False,
+                'func': self.send_to_bis01_checkboxes
+            },
             {'name': 'Продольная составляющая вектора скорости',
                 'coef': 4096 / 2 ** 16, 'signed': False},
             {'name': 'Вертикальная составляющая вектора скорости',
@@ -319,7 +322,7 @@ class MainWindow(QMainWindow):
         self.main_layout.addWidget(group_box)
 
     def change_su_widgets(self, data_widget):
-        widget_text = data_widget.text() 
+        widget_text = data_widget.text()
         if not widget_text:
             widget_text = 0
             self.to_diss_elems[0]['widget'].setText('0')
@@ -343,7 +346,6 @@ class MainWindow(QMainWindow):
 
     def convert_to_hex(self, chkbox, elems):
         for elem in elems:
-            elem['widget'].blockSignals(True)
             widget_text = elem['widget'].text()
             if not widget_text:
                 continue
@@ -358,29 +360,32 @@ class MainWindow(QMainWindow):
                         byte_value, byteorder="big", signed=elem['signed'])
                     text = f'{round(val * elem["coef"], 2)}'
             except:
-                if '.' in widget_text:
-                    text = widget_text
-                else:
-                    text = '0'
+                text = widget_text[1:]
 
             elem['widget'].setText(text)
-            elem['widget'].blockSignals(False)
+
+
 
     def int_to_date(self, data_widget: QLineEdit):
         data_widget.blockSignals(True)
-        try:
-            num = int(data_widget.text(), 16)
-            year = str(num >> 9).zfill(4)
+        widget_text = data_widget.text()
+        if not widget_text:
+            return
+        if self.to_bis02_hex_chkbox.isChecked() and len(widget_text) >= 7:
+            day, month, year = widget_text.split('.')
+            text = f'{(int(year) << 9) + (int(month) << 5) + int(day):04X}'
+        elif self.to_bis02_hex_chkbox.isChecked():
+            data_widget.blockSignals(False)
+            return
+        else:
+            num = int(widget_text)
+            year = str(num >> 9).zfill(2)
             month = str((num >> 5) & 0x0F).zfill(2)
             day = str(num & 0x1F).zfill(2)
-            data_widget.setText(f'{day}.{month}.{year}')
-        except:
-            day, month, year = [int(x) for x in data_widget.text().split('.')]
-            num = (year << 9) + (month << 5) + day
-            data_widget.setText(f'{num:04X}')
-        data_widget.blockSignals(False)
+            text = f'{day}.{month}.{year}'
 
-        
+        data_widget.setText(text)
+        data_widget.blockSignals(False)
 
     def activate_dev(self):
         if self.dev_handle is not None:
@@ -493,16 +498,23 @@ class MainWindow(QMainWindow):
         finally:
             self.deactivate_dev()
 
-        # recv_data = [0, 257,2,3,4,5,6,7]
+        # recv_data = [22, 257, 2, 3, 4, 5, 6, 7]
 
         for elem, val in zip(self.to_bis01_elems, recv_data):
-            string = f'{val:04X}' if self.to_bis01_hex_chkbox.isChecked(
-            ) else f'{round(val * elem["coef"], 2)}'
+            if self.to_bis01_hex_chkbox.isChecked():
+                string = f'{val:04X}'
+            else:
+                byte_value = binascii.unhexlify(f'{val:04X}')
+                val = int.from_bytes(
+                    byte_value, byteorder="big", signed=elem['signed'])
+                string = f'{round(val * elem["coef"], 2)}'
             elem['widget'].setText(string)
 
-
     def send_to_bis01_checkboxes(self, data_widget):
-        data_widget_value = int(data_widget.text())
+        if self.to_bis01_hex_chkbox.isChecked():
+            data_widget_value = int(data_widget.text(), 16)
+        else:
+            data_widget_value = int(data_widget.text())
         for widget, mask in self.to_biss_chkbox.items():
             if int(data_widget_value) & mask != 0:
                 widget.setDisabled(False)
@@ -531,11 +543,20 @@ class MainWindow(QMainWindow):
         finally:
             self.deactivate_dev()
 
-        # recv_data = [0, 257,2,3,4,5,6,7]
+        # from random import randint
+        # recv_data = [2, randint(0, 65000), 2, 3, 4, 5, 6, 7]
+        # print(recv_data)
+
         for elem, val in zip(self.to_bis02_elems, recv_data):
-            string = f'{val:04X}' if self.to_bis02_hex_chkbox.isChecked(
-            ) else f'{round(val * elem["coef"], 2)}'
+            if self.to_bis02_hex_chkbox.isChecked():
+                string = f'{val:04X}'
+            else:
+                byte_value = binascii.unhexlify(f'{val:04X}')
+                val = int.from_bytes(
+                    byte_value, byteorder="big", signed=elem['signed'])
+                string = f'{round(val * elem["coef"], 2)}'
             elem['widget'].setText(string)
+            
 
     def recieve_data(self, address, words, count):
         fr = self.lib.createFrame(self.dev_handle, 1000, 1)
