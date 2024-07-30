@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle("Purumka MKIO")
+        self.setWindowTitle("Purumka MKIO 2024-07-30")
         self.setGeometry(0, 0, 1350, 768)
 
         main_widget = QWidget()
@@ -129,6 +129,15 @@ class MainWindow(QMainWindow):
         self.dev_cmbbox = QComboBox()
         self.upd_dev_cmbbox()
         blk_layout.addWidget(self.dev_cmbbox)
+        
+        sa_label = QLabel('Адрес ОУ:')
+        sa_label.setFixedWidth(60)
+        self.sa_cmbbox = QComboBox()
+        self.sa_cmbbox.addItems([str(i) for i in range(32)])
+        self.sa_cmbbox.setCurrentIndex(4)
+        self.sa_cmbbox.setFixedWidth(60)
+        blk_layout.addWidget(sa_label)
+        blk_layout.addWidget(self.sa_cmbbox)
 
         self.chl_cmbbox = QComboBox()
         self.chl_cmbbox.addItems(['Шина А', 'Шина Б'])
@@ -447,7 +456,8 @@ class MainWindow(QMainWindow):
                         round(float(elem['widget'].text()) / elem['coef']))
 
             message = msp_Message()
-            self.lib.BCtoRT(message, 4, 1, 7, data, channel)
+            current_SA = self.sa_cmbbox.currentIndex()
+            self.lib.BCtoRT(message, current_SA, 1, 7, data, channel)
             self.lib.addMessage(
                 fr,
                 self.lib.createMessage(
@@ -563,11 +573,12 @@ class MainWindow(QMainWindow):
         channel = msp_BCCW_CHANNEL_B if self.chl_cmbbox.currentIndex() else msp_BCCW_CHANNEL_A
 
         message = msp_Message()
+        current_SA = self.sa_cmbbox.currentIndex()
         self.lib.addMessage(
             fr,
             self.lib.createMessage(
                 self.dev_handle,
-                self.lib.RTtoBC(message, 4, address, words, channel)
+                self.lib.RTtoBC(message, current_SA, address, words, channel)
             ),
             1000
         )
